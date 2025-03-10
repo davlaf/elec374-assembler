@@ -1,4 +1,5 @@
 import re
+import argparse
 
 class InvalidInstructionParsed(Exception):
     pass
@@ -123,7 +124,7 @@ def get_constant(constant_value: str) -> int:
     if value < -(0b011_1111_1111_1111_1111+1):
         raise InvalidInstructionParsed("constant value too negative")
     
-    return value & 0x3FFFF
+    return value & 0x7FFFF
 
 def get_branch_offset(argument: str, labels: dict[str,int], instruction_number: int) -> int:
     if argument in labels.keys():
@@ -386,6 +387,11 @@ subA:   ORG   0xB9            ; procedure subA
         if instruction_number in instruction_dict:
             raise Exception("Program overwrites itself (bad org statement)")
         instruction_dict[instruction_number] = instruction
+
+    # Initialize memory locations 0x54 and 0x92 with the 32-bit hexadecimal values
+    # 0x97 and 0x46, respectively. 
+    instruction_dict[0x54] = 0x97
+    instruction_dict[0x92] = 0x46
 
     with open("phase3_program.txt", "w") as f:
         for i in range(511):
