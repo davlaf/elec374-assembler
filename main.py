@@ -384,7 +384,6 @@ subA:   ORG   0xB9            ; procedure subA
     instruction_dict: dict[int, int] = {}
     for instruction_number, instruction in encoded_instructions:
         if instruction_number in instruction_dict:
-            print("wow!")
             raise Exception("Program overwrites itself (bad org statement)")
         instruction_dict[instruction_number] = instruction
 
