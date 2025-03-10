@@ -1,1 +1,4 @@
 /.vscode
+*.s
+*.txt
+!phase3_program.s
