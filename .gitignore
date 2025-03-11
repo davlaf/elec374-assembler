@@ -1,4 +1,5 @@
 /.vscode
 *.s
 *.txt
+*.mem
 !phase3_program.s

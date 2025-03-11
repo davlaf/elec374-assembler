@@ -102,13 +102,16 @@ def get_register_number(register_name: str) -> int:
     
     return register_mapping[register_name.lower()]
 
-def get_constant(constant_value: str) -> int:
+def get_constant(constant_value: str, bit_width: int = 19) -> int:
+    is_signed = True
     constant_value = constant_value.lower()
 
     if match := re.match(r"^0b(?P<number>[10]+)$", constant_value):
+        is_signed = False
         value = int(match.groupdict()['number'], 2)
 
     elif match := re.match(r"^0x(?P<number>[0-9a-f]+)$", constant_value):
+        is_signed = False
         value = int(match.groupdict()['number'], 16)
 
     elif match := re.match(r"^-\s*(?P<number>[0-9]+)$", constant_value):
@@ -116,17 +119,32 @@ def get_constant(constant_value: str) -> int:
 
     elif match := re.match(r"^(?P<number>[0-9]+)$", constant_value):
         value = int(match.groupdict()['number'], 10)
-
     else:
         raise InvalidInstructionParsed(f"could not parse constant value: {constant_value}")
 
-    if value > 0b011_1111_1111_1111_1111:
-        raise InvalidInstructionParsed("constant value too large")
+    max_unsigned_value = 2**bit_width - 1
+    max_signed_value = 2**(bit_width-1) - 1
+    min_signed_value = -2**(bit_width-1)
+
+    if (not is_signed):
+        if value < 0:
+            raise InvalidInstructionParsed(f"unsigned value {constant_value} (decimal {value}) is negative??")
+        elif value > max_unsigned_value:
+            raise InvalidInstructionParsed(f"unsigned value {constant_value} (decimal {value}) is above the maximum of {max_unsigned_value}")
+        else:
+            if value > max_signed_value:
+                print(f"WARNING: unsigned constant value {constant_value} will be treated as negative by CPU")
+            return value
+        
+    # value is signed
     
-    if value < -(0b011_1111_1111_1111_1111+1):
-        raise InvalidInstructionParsed("constant value too negative")
-    
-    return value & 0x7FFFF
+    if value > max_signed_value:
+        raise InvalidInstructionParsed(f"signed constant value {constant_value} (decimal {value}) above the max value of {max_signed_value}")
+
+    if value < min_signed_value:
+        raise InvalidInstructionParsed(f"signed constant value {constant_value} (decimal {value}) below the min value of {min_signed_value}")
+
+    return value
 
 def get_branch_offset(argument: str, labels: dict[str,int], instruction_number: int) -> int:
     if argument in labels.keys():
@@ -141,10 +159,10 @@ def r_format(opcode: int, ra: int, rb: int, rc: int) -> int:
     return (opcode << 27) | (ra << 23) | (rb << 19) | (rc << 15) | 0
 
 def i_format(opcode: int, ra: int, rb: int, c: int =0) -> int:
-    return (opcode << 27) | (ra << 23) | (rb << 19) | c
+    return (opcode << 27) | (ra << 23) | (rb << 19) | c & 0x7FFFF
 
 def b_format(opcode: int, ra: int, c2: int, c: int):
-    return (opcode << 27) | (ra << 23) | (c2 << 19) | c
+    return (opcode << 27) | (ra << 23) | (c2 << 19) | c & 0x7FFFF
 
 def j_format(opcode: int, ra: int):
     return (opcode << 27) | (ra << 23) | 0
@@ -176,7 +194,7 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
         return r_format(opcode, ra, rb, rc)
 
     elif instruction_name in reg_reg_const:
-        match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<rb>\w+)\s*,\s*(?P<const>[\w-]+)\s*$", line)
+        match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<rb>\w+)\s*,\s*(?P<const>[\w \-]+)\s*$", line)
         if match is None:
             raise InvalidInstructionParsed(f"failed to parse reg reg const instruction: {line}")
         match_dict = match.groupdict()
@@ -187,7 +205,7 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
     
     elif instruction_name in reg_label:
         #                                                 const can also be a label
-        match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<const>[\w-]+)\s*$", line)
+        match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<const>[\w \-]+)\s*$", line)
         if match is None:
             raise InvalidInstructionParsed(f"failed to parse reg label instruction: {line}")
         match_dict = match.groupdict()
@@ -215,10 +233,10 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
 
     elif instruction_name in reg_offset_reg:
         # also handle the r0 case
-        match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<const>[\w-]+)\s*\(\s*(?P<rb>\w+)\s*\)\s*$", line)
+        match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<const>[\w \-]+)\s*\(\s*(?P<rb>\w+)\s*\)\s*$", line)
         if match is None:
             # try matching without it
-            match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<const>[\w-]+)\s*$", line)
+            match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<const>[\w \-]+)\s*$", line)
             if match is None:
                 raise InvalidInstructionParsed(f"failed to parse reg offset reg instruction: {line}")
 
@@ -230,10 +248,10 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
 
     elif instruction_name in offset_reg_reg:
         # also handle the r0 case
-        match = re.match(r"^\s*\w+\s+(?P<const>[\w-]+)\s*\(\s*(?P<rb>\w+)\s*\)\s*,\s*(?P<ra>\w+)\s*$", line)
+        match = re.match(r"^\s*\w+\s+(?P<const>[\w \-]+)\s*\(\s*(?P<rb>\w+)\s*\)\s*,\s*(?P<ra>\w+)\s*$", line)
         if match is None:
             # try matching without it
-            match = re.match(r"^\s*\w+\s+(?P<const>[\w-]+)\s*,\s*(?P<ra>\w+)\s*$", line)
+            match = re.match(r"^\s*\w+\s+(?P<const>[\w \-]+)\s*,\s*(?P<ra>\w+)\s*$", line)
             if match is None:
                 raise InvalidInstructionParsed(f"failed to parse offset reg reg instruction: {line}")
 
@@ -282,14 +300,23 @@ def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]]]:
         line_labels, instruction = extract_labels_and_instruction(line)
 
         for label in line_labels:
-            labels[label] = instruction_number
+            if label not in labels:
+                labels[label] = instruction_number
+            else:
+                raise InvalidInstructionParsed(f"Duplicate labels with name: {label}")
 
         if instruction == "":
             continue
 
         # check for assembler directives that do special behavior
-        if match := re.match(r"^\s*org\s+(?P<const>\w+)\s*$", instruction.lower()):
-            instruction_number = get_constant(match.groupdict()['const'])
+        if match := re.match(r"^\s*org\s+(?P<const>[\w \-]+)\s*$", instruction.lower()):
+            org_value = get_constant(match.groupdict()['const'])
+            if (org_value > 511):
+                raise InvalidInstructionParsed(f"org value {match.groupdict()['const']} (decimal {org_value}) is above the maximum of 511")
+            if (org_value < 0):
+                raise InvalidInstructionParsed(f"org value {match.groupdict()['const']} (decimal {org_value}) must be above 0")
+            
+            instruction_number = org_value
             continue
         
         instruction_list.append((instruction_number, instruction))
@@ -303,7 +330,10 @@ def second_pass(labels: dict[str, int], instructions: list[tuple[int,str]]) -> l
 
         # assembler directives to change memory data
         if match := re.match(r"^\s*word\s+(?P<const>\w+)\s*$", instruction.lower()):
-            constant = get_constant(match.groupdict()['const'])
+            constant = get_constant(
+                match.groupdict()['const'],
+                bit_width=32,
+            )
             memory_entries.append((memory_address, constant))
             continue
 
@@ -311,9 +341,9 @@ def second_pass(labels: dict[str, int], instructions: list[tuple[int,str]]) -> l
 
     return memory_entries
 
-def assemble(code:str) -> list[tuple[int,int]]:
+def assemble(code:str) -> tuple[dict[str, int], list[tuple[int, str]], list[tuple[int,int]]]:
     labels, instructions = first_pass(code)
-    return second_pass(labels, instructions)
+    return labels, instructions, second_pass(labels, instructions)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -331,21 +361,31 @@ if __name__ == "__main__":
     
     if args.output == None:
         if match := re.match(r"^(.*)\..*?$", input_filename):
-            output_filename = f"{match.groups()[0]}.txt"
+            output_filename = f"{match.groups()[0]}.mem"
         else:
-            output_filename = f"{input_filename}.txt"
+            output_filename = f"{input_filename}.mem"
     else:
         output_filename: str = args.output
 
     is_verbose: bool = args.verbose
     
-
     try:
         file_string: str
         with open(input_filename, "r", encoding="utf8") as f:
             file_string = f.read()
         
-        encoded_instructions = assemble(file_string)
+        labels, instructions, encoded_instructions = assemble(file_string)
+
+        instruction_dict: dict[int, str] = {}
+        for address, instruction in instructions:
+            instruction_dict[address] = instruction
+
+        label_dict: dict[int, list[str]] = {}
+        for label, address in labels.items():
+            if address in label_dict:
+                label_dict[address].append(label)
+            else:
+                label_dict[address] = [label]
 
         if is_verbose:
             for instruction_number, instruction in encoded_instructions:
@@ -361,10 +401,16 @@ if __name__ == "__main__":
             memory[instruction_number] = instruction
 
         with open(output_filename, "w") as f:
-            for i in range(511):
-                f.write(f"{memory.get(i, 0):08X}\n")
-
-            f.write(f"{memory.get(511, 0):08X}")
+            f.write("// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n")
+            for i in range(512):
+                if label_list := label_dict.get(i):
+                    [f.write(f"// {label}:\n") for label in label_list]
+                f.write(f"{f'@{i:X}'.rjust(3)} {memory.get(i, 0):08X}")
+                if instruction := instruction_dict.get(i):
+                    f.write(f" // {instruction}\n")
+                else:
+                    f.write("\n")
+            f.write("// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)")
 
         # not necessarily instructions if the word directive is used
         print(f"Successfully wrote {len(encoded_instructions)} data words to {output_filename}")
