@@ -309,17 +309,15 @@ def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]]]:
     for line in code_lines:
         line_labels, instruction = extract_labels_and_instruction(line)
 
-        for label in line_labels:
-            if label not in labels:
-                labels[label] = instruction_number
-            else:
-                raise InvalidInstructionParsed(f"Duplicate labels with name: {label}")
+        line_has_instruction = True # directives don't count as instructions
 
         if instruction == "":
-            continue
+            line_has_instruction = False
 
         # check for assembler directives that do special behavior
+        # check for org first
         if match := re.match(r"^\s*org\s+(?P<const>[\w \-]+)\s*$", instruction.lower()):
+            line_has_instruction = False
             org_value = get_constant(match.groupdict()['const'], labels)
             if (org_value > 511):
                 raise InvalidInstructionParsed(f"org value {match.groupdict()['const']} (decimal {org_value}) is above the maximum of 511")
@@ -327,6 +325,14 @@ def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]]]:
                 raise InvalidInstructionParsed(f"org value {match.groupdict()['const']} (decimal {org_value}) must be above 0")
             
             instruction_number = org_value
+
+        for label in line_labels:
+            if label not in labels:
+                labels[label] = instruction_number
+            else:
+                raise InvalidInstructionParsed(f"Duplicate labels with name: {label}")
+
+        if not line_has_instruction:
             continue
         
         instruction_list.append((instruction_number, instruction))
