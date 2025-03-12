@@ -50,10 +50,6 @@ subA:   ORG   0xB9            ; procedure subA
         jr    R8              ; return from procedure
                
         ORG   0x54 ; initialize memory as asked
-first_number:
         WORD  0x97
         ORG   0x92
-second_number:
         WORD  0x46
-
-        st first_number, r3
