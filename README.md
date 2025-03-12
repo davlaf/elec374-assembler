@@ -37,7 +37,7 @@ python SRC-ASM.py <input_filename> -o <output_filename> [-v]
 ### Parameters:
 
 - `<input_filename>`: The path to your assembly source file.
-- `-o` or `--output`: The path for the output hex file. If omitted, the output file name will be derived from the input file name (with a .txt extension).
+- `-o` or `--output`: The path for the output hex file. If omitted, the output file name will be derived from the input file name (with a .mem extension).
 - `-v` or `--verbose`: Optional flag. When enabled, the assembler prints the encoded instruction (with addresses) to the console.
 ## Example
 Assume you have an assembly file named `program.s`. To assemble this file and output the hex dump to `output.txt`, run:
@@ -45,7 +45,7 @@ Assume you have an assembly file named `program.s`. To assemble this file and ou
 ```bash
 python SRC-ASM.py program.s -o output.txt -v
 ```
-If the `-o` option is omitted, the assembler will create an output file named `program.txt` by default.
+If the `-o` option is omitted, the assembler will create an output file named `program.mem`.
 
 ## Output Format
 The output file will contain 512 lines (one for each memory word from address 0 to 511) with each line displaying an 8-digit hexadecimal number representing the encoded 32-bit instruction or data. Unused memory locations will be filled with 00000000.
