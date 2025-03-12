@@ -4,6 +4,7 @@ The ELEC374 MiniSRC Assembler is a Python tool designed to translate assembly co
 
 This assembler supports the following instructions:
 
+`
 - Register register to register (e.g., `add`, `sub`, `and`, `or`, `ror`, `rol`, `shr`, `shra`, `shl`)
 - Register to register with constant immediate (e.g., `addi`, `andi`, `ori`)
 - Branch instructions with labels (e.g., `brzr`, `brnz`, `brpl`, `brmi`)
@@ -12,6 +13,7 @@ This assembler supports the following instructions:
 - Single-register instructions (e.g., `jal`, `jr`, `in`, `out`, `mflo`, `mfhi`)
 - No-argument instructions (e.g., `nop`, `halt`)
 
+It supports labels anywhere you would use a constant. Branch offsets are automatically calculated when using labels, but branch instructions also support constant values.
 
 It also supports these assembler directives:
 - `org <const value>`: Sets the current address for subsequent code
@@ -21,7 +23,7 @@ It works by performing two passes:
 
 1. **First Pass:** Extracts labels and assigns instruction addresses (also handles org assembler directive).
 
-2. **Second Pass:** Encodes each instruction into its 32-bit machine code representation. (also handles )
+2. **Second Pass:** Encodes each instruction into its 32-bit machine code representation. (also handles the word directive)
 ## Usage
 ### Prerequisites
 - Python 3.6 or later.
