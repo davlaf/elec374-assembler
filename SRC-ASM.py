@@ -362,7 +362,7 @@ def assemble(code:str) -> tuple[dict[str, int], list[tuple[int, str]], list[tupl
     labels, instructions = first_pass(code)
     return labels, instructions, second_pass(labels, instructions)
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
                     prog='ELEC374 MiniSRC Assembler',
                     usage='python SRC-ASM.py <input filename> -o <output filename>',
@@ -421,8 +421,8 @@ if __name__ == "__main__":
             f.write("// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n")
             for i in range(512):
                 if label_list := label_dict.get(i):
-                    [f.write(f"// {label}:\n") for label in label_list]
-                f.write(f"{f'@{i:X}'.rjust(3)} {memory.get(i, 0):08X}")
+                    [f.write(f"//   {label}:\n") for label in label_list]
+                f.write(f"{f'@{i:X}'.rjust(4, ' ')} {memory.get(i, 0):08X}")
                 if instruction := instruction_dict.get(i):
                     f.write(f" // {instruction}\n")
                 else:
@@ -436,4 +436,7 @@ if __name__ == "__main__":
             print(traceback.format_exc())
         else:
             print(f"Error when assembling: {e}")
+
+if __name__ == "__main__":
+    main()
         
