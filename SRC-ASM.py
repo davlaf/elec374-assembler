@@ -88,7 +88,7 @@ opcodes = {
 
 reg_reg_reg = ["add", "sub", "and", "or", "ror", "rol", "shr", "shra", "shl"]
 reg_reg_const = ["addi", "andi", "ori"]
-reg_label = ["brzr", "brnz", "brpl", "brmi"]
+reg_const = ["brzr", "brnz", "brpl", "brmi"]
 reg_offset_reg = ["ld", "ldi"]
 offset_reg_reg = ["st"]
 reg_reg = ["mul", "div", "not", "neg"]
@@ -102,8 +102,12 @@ def get_register_number(register_name: str) -> int:
     
     return register_mapping[register_name.lower()]
 
-def get_constant(constant_value: str, bit_width: int = 19) -> int:
+def get_constant(constant_value: str, labels: dict[str,int], bit_width: int = 19) -> int:
     is_signed = True
+
+    if constant_value in labels:
+        return labels[constant_value]
+
     constant_value = constant_value.lower()
 
     if match := re.match(r"^0b(?P<number>[10]+)$", constant_value):
@@ -151,9 +155,14 @@ def get_branch_offset(argument: str, labels: dict[str,int], instruction_number: 
         return (labels[argument] - 1) - instruction_number
     
     try:
-        return get_constant(argument)
+        return get_constant(argument, labels)
     except InvalidInstructionParsed as e:
         raise InvalidInstructionParsed(f"{str(e)}\nMaybe you misspelled a label?")
+
+def validate_opcode(opcode: int) -> bool:
+    if 0 <= opcode < 0b11111:
+        return True
+    raise InvalidInstructionParsed(f"Opcode outside of range: {opcode}")
 
 def r_format(opcode: int, ra: int, rb: int, rc: int) -> int:
     return (opcode << 27) | (ra << 23) | (rb << 19) | (rc << 15) | 0
@@ -161,13 +170,13 @@ def r_format(opcode: int, ra: int, rb: int, rc: int) -> int:
 def i_format(opcode: int, ra: int, rb: int, c: int =0) -> int:
     return (opcode << 27) | (ra << 23) | (rb << 19) | c & 0x7FFFF
 
-def b_format(opcode: int, ra: int, c2: int, c: int):
+def b_format(opcode: int, ra: int, c2: int, c: int) -> int:
     return (opcode << 27) | (ra << 23) | (c2 << 19) | c & 0x7FFFF
 
-def j_format(opcode: int, ra: int):
+def j_format(opcode: int, ra: int) -> int:
     return (opcode << 27) | (ra << 23) | 0
 
-def m_format(opcode: int):
+def m_format(opcode: int) -> int:
     return (opcode << 27) | 0
 
 def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int:
@@ -182,6 +191,7 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
         raise InvalidInstructionParsed(f"unknown instruction name: {instruction_name}")
     
     opcode = opcodes[instruction_name]
+    validate_opcode(opcode)
 
     if instruction_name in reg_reg_reg:
         match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<rb>\w+)\s*,\s*(?P<rc>\w+)\s*$", line)
@@ -200,10 +210,10 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
         match_dict = match.groupdict()
         ra = get_register_number(match_dict['ra'])
         rb = get_register_number(match_dict['rb'])
-        const = get_constant(match_dict['const'])
+        const = get_constant(match_dict['const'], labels)
         return i_format(opcode, ra, rb, const)
     
-    elif instruction_name in reg_label:
+    elif instruction_name in reg_const:
         #                                                 const can also be a label
         match = re.match(r"^\s*\w+\s+(?P<ra>\w+)\s*,\s*(?P<const>[\w \-]+)\s*$", line)
         if match is None:
@@ -243,7 +253,7 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
         match_dict = match.groupdict()
         ra = get_register_number(match_dict['ra'])
         rb = get_register_number(match_dict.get('rb', "r0"))
-        const = get_constant(match_dict['const'])
+        const = get_constant(match_dict['const'], labels)
         return i_format(opcode, ra, rb, const)
 
     elif instruction_name in offset_reg_reg:
@@ -258,7 +268,7 @@ def parse_line(line: str, labels: dict[str,int], instruction_number: int) -> int
         match_dict = match.groupdict()
         ra = get_register_number(match_dict['ra'])
         rb = get_register_number(match_dict.get('rb', "r0"))
-        const = get_constant(match_dict['const'])
+        const = get_constant(match_dict['const'], labels)
         return i_format(opcode, ra, rb, const)
 
     elif instruction_name in no_args:
@@ -310,7 +320,7 @@ def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]]]:
 
         # check for assembler directives that do special behavior
         if match := re.match(r"^\s*org\s+(?P<const>[\w \-]+)\s*$", instruction.lower()):
-            org_value = get_constant(match.groupdict()['const'])
+            org_value = get_constant(match.groupdict()['const'], labels)
             if (org_value > 511):
                 raise InvalidInstructionParsed(f"org value {match.groupdict()['const']} (decimal {org_value}) is above the maximum of 511")
             if (org_value < 0):
@@ -332,6 +342,7 @@ def second_pass(labels: dict[str, int], instructions: list[tuple[int,str]]) -> l
         if match := re.match(r"^\s*word\s+(?P<const>\w+)\s*$", instruction.lower()):
             constant = get_constant(
                 match.groupdict()['const'],
+                labels,
                 bit_width=32,
             )
             memory_entries.append((memory_address, constant))
