@@ -2,4 +2,5 @@
 *.s
 *.txt
 *.mem
+*.mif
 !phase3_program.s

@@ -17,7 +17,11 @@ It supports labels anywhere you would use a constant. Branch offsets are automat
 
 It also supports these assembler directives:
 - `org <const value>`: Sets the current address for subsequent code
-- `word <const value>`: Puts a specific constant value in memory at the current memory adress 
+- `word <const value>`: Puts a specific constant value in memory at the current memory address 
+
+Two output formats are supported:
+- `mem` format: For using ModelSim and the `$readmemh` function
+- `mif` format: For use with Quartus
 
 It works by performing two passes:
 

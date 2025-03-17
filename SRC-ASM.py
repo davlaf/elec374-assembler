@@ -365,7 +365,7 @@ def assemble(code:str) -> tuple[dict[str, int], list[tuple[int, str]], list[tupl
 def main():
     parser = argparse.ArgumentParser(
                     prog='ELEC374 MiniSRC Assembler',
-                    usage='python SRC-ASM.py <input filename> -o <output filename>',
+                    usage='python SRC-ASM.py <input path> -o <output path> -t [mem|mif]',
                     description='Takes an assembly file and produces a hex dump of the encoded instructions, with syntax supported by modelsim to allow it to be added into the memory with the $readmemh',
                     epilog='Contact asmhelp@davlaf.com if you have questions or to report bugs, or raise a github Issue')
 
@@ -373,6 +373,7 @@ def main():
     parser.add_argument('-o', '--output')      # output filename
     parser.add_argument('-v', '--verbose',
                     action='store_true')  # on/off flag
+    parser.add_argument('-t', '--type', default="mem", choices=["mem", "mif"])
     args = parser.parse_args()
     input_filename: str = args.filename
     
@@ -418,17 +419,11 @@ def main():
             memory[instruction_number] = instruction
 
         with open(output_filename, "w") as f:
-            f.write("// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n")
-            for i in range(512):
-                if label_list := label_dict.get(i):
-                    [f.write(f"//   {label}:\n") for label in label_list]
-                f.write(f"{f'@{i:X}'.rjust(4, ' ')} {memory.get(i, 0):08X}")
-                if instruction := instruction_dict.get(i):
-                    f.write(f" // {instruction}\n")
-                else:
-                    f.write("\n")
-            f.write("// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)")
-
+            if args.type == "mem":
+                f.write(mem_format(instruction_dict, label_dict, memory))
+            if args.type == "mif":
+                f.write(mif_format(instruction_dict, label_dict, memory))
+            
         # not necessarily instructions if the word directive is used
         print(f"Successfully wrote {len(encoded_instructions)} data words to {output_filename}")
     except Exception as e:
@@ -436,6 +431,42 @@ def main():
             print(traceback.format_exc())
         else:
             print(f"Error when assembling: {e}")
+
+def mem_format(instruction_dict: dict[int, str], label_dict: dict[int, list[str]], memory: dict[int, int]) -> str:
+    output: str
+    output = "// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n"
+    for i in range(512):
+        if label_list := label_dict.get(i):
+            output += "".join([f"//   {label}:\n" for label in label_list])
+        output += (f"{f'@{i:X}'.rjust(4, ' ')} {memory.get(i, 0):08X}")
+        if instruction := instruction_dict.get(i):
+            output += (f" // {instruction}\n")
+        else:
+            output += ("\n")
+    output += ("// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)")
+    return output
+
+def mif_format(instruction_dict: dict[int, str], label_dict: dict[int, list[str]], memory: dict[int, int]) -> str:
+    output = """-- Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)
+WIDTH=32;
+DEPTH=512;
+ 
+ADDRESS_RADIX=HEX;
+DATA_RADIX=HEX;
+ 
+CONTENT BEGIN
+"""
+    for i in range(512):
+        if label_list := label_dict.get(i):
+            output += "".join([f"--   {label}:\n" for label in label_list])
+        output += (f"{f'{i:X}'.rjust(3, ' ')}: {memory.get(i, 0):08X}")
+        if instruction := instruction_dict.get(i):
+            output += (f" -- {instruction}\n")
+        else:
+            output += ("\n")
+    output += "END;\n"
+    output += "-- Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n"
+    return output
 
 if __name__ == "__main__":
     main()
