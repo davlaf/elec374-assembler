@@ -4,3 +4,4 @@
 *.mem
 *.mif
 !phase3_program.s
+!phase4_program.s

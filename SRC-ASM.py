@@ -289,24 +289,25 @@ def extract_labels_and_instruction(line: str) -> tuple[list[str],str]:
     
     return labels, line.strip()
 
-def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]]]:
+def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]], list[tuple[int,str]]]:
 
     code_lines_with_comments = code_string.splitlines()
 
-    # remove comments
-    code_lines: list[str] = []
-    for line in code_lines_with_comments:
-        line_match = re.match(r"(?P<line_no_comment>.*?);.*", line)
-        if line_match is not None:
-            code_lines.append(line_match.groupdict()["line_no_comment"])
-        else:
-            code_lines.append(line)
-
     labels: dict[str, int] = {}
     instruction_list: list[tuple[int,str]] = []
+    comments: list[tuple[int,str]] = []
 
     instruction_number = 0
-    for line in code_lines:
+    for line_with_comment in code_lines_with_comments:
+        line_match = re.match(r"(?P<line_no_comment>.*?);(?P<comment>.*)", line_with_comment)
+        line: str
+        comment: str = ""
+        if line_match is not None:
+            line = line_match.groupdict()["line_no_comment"]
+            comment = line_match.groupdict()["comment"]
+        else:
+            line = line_with_comment
+
         line_labels, instruction = extract_labels_and_instruction(line)
 
         line_has_instruction = True # directives don't count as instructions
@@ -325,6 +326,10 @@ def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]]]:
                 raise InvalidInstructionParsed(f"org value {match.groupdict()['const']} (decimal {org_value}) must be above 0")
             
             instruction_number = org_value
+        
+        # add comment after org directive changes inst number
+        if comment != "":
+            comments.append((instruction_number, comment))
 
         for label in line_labels:
             if label not in labels:
@@ -338,7 +343,7 @@ def first_pass(code_string: str) -> tuple[dict[str,int], list[tuple[int,str]]]:
         instruction_list.append((instruction_number, instruction))
         instruction_number += 1
 
-    return labels, instruction_list
+    return labels, instruction_list, comments
     
 def second_pass(labels: dict[str, int], instructions: list[tuple[int,str]]) -> list[tuple[int,int]]:
     memory_entries: list[tuple[int,int]] = []
@@ -358,9 +363,9 @@ def second_pass(labels: dict[str, int], instructions: list[tuple[int,str]]) -> l
 
     return memory_entries
 
-def assemble(code:str) -> tuple[dict[str, int], list[tuple[int, str]], list[tuple[int,int]]]:
-    labels, instructions = first_pass(code)
-    return labels, instructions, second_pass(labels, instructions)
+def assemble(code:str) -> tuple[dict[str, int], list[tuple[int, str]], list[tuple[int, str]], list[tuple[int,int]]]:
+    labels, instructions, comments = first_pass(code)
+    return labels, instructions, comments, second_pass(labels, instructions)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -376,23 +381,35 @@ def main():
     parser.add_argument('-t', '--type', default="mem", choices=["mem", "mif"])
     args = parser.parse_args()
     input_filename: str = args.filename
-    
-    if args.output == None:
-        if match := re.match(r"^(.*)\..*?$", input_filename):
-            output_filename = f"{match.groups()[0]}.mem"
-        else:
-            output_filename = f"{input_filename}.mem"
-    else:
-        output_filename: str = args.output
-
+    file_extension: str = args.type
     is_verbose: bool = args.verbose
     
     try:
+        if args.output is None:
+            if match := re.match(r"^(.*)\..*?$", input_filename):
+                output_filename = f"{match.groups()[0]}.{file_extension}"
+            else:
+                output_filename = f"{input_filename}.{file_extension}"  
+        else:
+            output_filename: str = args.output
+            # check if the file extension is different from the type argument
+            if match := re.match(r"^.*\.(.*?)$", args.output):
+                output_filename_file_extension = match.groups()[0]
+                if output_filename_file_extension != file_extension:
+                    print("Warning: Output filename and specified file type don't match")
+
         file_string: str
         with open(input_filename, "r", encoding="utf8") as f:
             file_string = f.read()
         
-        labels, instructions, encoded_instructions = assemble(file_string)
+        labels, instructions, comments, encoded_instructions = assemble(file_string)
+
+        comment_dict: dict[int, list[str]] = {}
+        for address, comment in comments:
+            if address in comment_dict:
+                comment_dict[address].append(comment)
+            else:
+                comment_dict[address] = [comment]
 
         instruction_dict: dict[int, str] = {}
         for address, instruction in instructions:
@@ -419,10 +436,14 @@ def main():
             memory[instruction_number] = instruction
 
         with open(output_filename, "w") as f:
-            if args.type == "mem":
-                f.write(mem_format(instruction_dict, label_dict, memory))
-            if args.type == "mif":
-                f.write(mif_format(instruction_dict, label_dict, memory))
+            file_contents: str
+            
+            if file_extension == "mif":
+                file_contents = mif_format(instruction_dict, label_dict, comment_dict, memory)
+            else:
+                file_contents = mem_format(instruction_dict, label_dict, comment_dict, memory)
+
+            f.write(file_contents.encode("ascii", errors="ignore").decode())
             
         # not necessarily instructions if the word directive is used
         print(f"Successfully wrote {len(encoded_instructions)} data words to {output_filename}")
@@ -432,21 +453,27 @@ def main():
         else:
             print(f"Error when assembling: {e}")
 
-def mem_format(instruction_dict: dict[int, str], label_dict: dict[int, list[str]], memory: dict[int, int]) -> str:
+def mem_format(instruction_dict: dict[int, str], label_dict: dict[int, list[str]], comment_dict: dict[int, list[str]], memory: dict[int, int]) -> str:
     output: str
     output = "// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n"
     for i in range(512):
         if label_list := label_dict.get(i):
             output += "".join([f"//   {label}:\n" for label in label_list])
         output += (f"{f'@{i:X}'.rjust(4, ' ')} {memory.get(i, 0):08X}")
+
+        line_comment = ""
         if instruction := instruction_dict.get(i):
-            output += (f" // {instruction}\n")
-        else:
-            output += ("\n")
+            line_comment += (f"{instruction.ljust(18)}")
+        if comment_list := comment_dict.get(i):
+            line_comment += f"; {' ; '.join([comment.strip() for comment in comment_list])}"
+
+        if line_comment != "":
+            output += f" // {line_comment}"
+        output += "\n"
     output += ("// Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)")
     return output
 
-def mif_format(instruction_dict: dict[int, str], label_dict: dict[int, list[str]], memory: dict[int, int]) -> str:
+def mif_format(instruction_dict: dict[int, str], label_dict: dict[int, list[str]], comment_dict: dict[int, list[str]], memory: dict[int, int]) -> str:
     output = """-- Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)
 WIDTH=32;
 DEPTH=512;
@@ -459,11 +486,17 @@ CONTENT BEGIN
     for i in range(512):
         if label_list := label_dict.get(i):
             output += "".join([f"--   {label}:\n" for label in label_list])
-        output += (f"{f'{i:X}'.rjust(3, ' ')}: {memory.get(i, 0):08X}")
+        output += (f"{f'{i:X}'.rjust(3, ' ')}: {memory.get(i, 0):08X};")
+
+        line_comment = ""
         if instruction := instruction_dict.get(i):
-            output += (f" -- {instruction}\n")
-        else:
-            output += ("\n")
+            line_comment += (f"{instruction.ljust(18)}")
+        if comment_list := comment_dict.get(i):
+            line_comment += f"; {' ; '.join([comment.strip() for comment in comment_list])}"
+
+        if line_comment != "":
+            output += f" -- {line_comment}"
+        output += "\n"
     output += "END;\n"
     output += "-- Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n"
     return output
