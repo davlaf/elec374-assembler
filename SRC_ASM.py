@@ -367,91 +367,42 @@ def assemble(code:str) -> tuple[dict[str, int], list[tuple[int, str]], list[tupl
     labels, instructions, comments = first_pass(code)
     return labels, instructions, comments, second_pass(labels, instructions)
 
-def main():
-    parser = argparse.ArgumentParser(
-                    prog='ELEC374 MiniSRC Assembler',
-                    usage='python SRC-ASM.py <input path> -o <output path> -t [mem|mif]',
-                    description='Takes an assembly file and produces a hex dump of the encoded instructions, with syntax supported by modelsim to allow it to be added into the memory with the $readmemh',
-                    epilog='Contact asmhelp@davlaf.com if you have questions or to report bugs, or raise a github Issue')
+def assembly_to_file(file_extension: str, file_string: str):
+    labels, instructions, comments, encoded_instructions = assemble(file_string)
 
-    parser.add_argument('filename') # input filename
-    parser.add_argument('-o', '--output')      # output filename
-    parser.add_argument('-v', '--verbose',
-                    action='store_true')  # on/off flag
-    parser.add_argument('-t', '--type', default="mem", choices=["mem", "mif"])
-    args = parser.parse_args()
-    input_filename: str = args.filename
-    file_extension: str = args.type
-    is_verbose: bool = args.verbose
-    
-    try:
-        if args.output is None:
-            if match := re.match(r"^(.*)\..*?$", input_filename):
-                output_filename = f"{match.groups()[0]}.{file_extension}"
-            else:
-                output_filename = f"{input_filename}.{file_extension}"  
+    comment_dict: dict[int, list[str]] = {}
+    for address, comment in comments:
+        if address in comment_dict:
+            comment_dict[address].append(comment)
         else:
-            output_filename: str = args.output
-            # check if the file extension is different from the type argument
-            if match := re.match(r"^.*\.(.*?)$", args.output):
-                output_filename_file_extension = match.groups()[0]
-                if output_filename_file_extension != file_extension:
-                    print("Warning: Output filename and specified file type don't match")
+            comment_dict[address] = [comment]
 
-        file_string: str
-        with open(input_filename, "r", encoding="utf8") as f:
-            file_string = f.read()
-        
-        labels, instructions, comments, encoded_instructions = assemble(file_string)
+    instruction_dict: dict[int, str] = {}
+    for address, instruction in instructions:
+        instruction_dict[address] = instruction
 
-        comment_dict: dict[int, list[str]] = {}
-        for address, comment in comments:
-            if address in comment_dict:
-                comment_dict[address].append(comment)
-            else:
-                comment_dict[address] = [comment]
-
-        instruction_dict: dict[int, str] = {}
-        for address, instruction in instructions:
-            instruction_dict[address] = instruction
-
-        label_dict: dict[int, list[str]] = {}
-        for label, address in labels.items():
-            if address in label_dict:
-                label_dict[address].append(label)
-            else:
-                label_dict[address] = [label]
-
-        if is_verbose:
-            for instruction_number, instruction in encoded_instructions:
-                print(f"{instruction_number:02X} {instruction:08X}")
-        
-        if max([instruction[0] for instruction in encoded_instructions]) >= 512:
-            raise Exception("Program too long")
-        
-        memory: dict[int, int] = {}
-        for instruction_number, instruction in encoded_instructions:
-            if instruction_number in memory:
-                raise Exception("Program overwrites itself (bad org statement)")
-            memory[instruction_number] = instruction
-
-        with open(output_filename, "w") as f:
-            file_contents: str
-            
-            if file_extension == "mif":
-                file_contents = mif_format(instruction_dict, label_dict, comment_dict, memory)
-            else:
-                file_contents = mem_format(instruction_dict, label_dict, comment_dict, memory)
-
-            f.write(file_contents.encode("ascii", errors="ignore").decode())
-            
-        # not necessarily instructions if the word directive is used
-        print(f"Successfully wrote {len(encoded_instructions)} data words to {output_filename}")
-    except Exception as e:
-        if is_verbose:
-            print(traceback.format_exc())
+    label_dict: dict[int, list[str]] = {}
+    for label, address in labels.items():
+        if address in label_dict:
+            label_dict[address].append(label)
         else:
-            print(f"Error when assembling: {e}")
+            label_dict[address] = [label]
+
+    if max([instruction[0] for instruction in encoded_instructions]) >= 512:
+        raise Exception("Program too long")
+        
+    memory: dict[int, int] = {}
+    for instruction_number, instruction in encoded_instructions:
+        if instruction_number in memory:
+            raise Exception("Program overwrites itself (bad org statement)")
+        memory[instruction_number] = instruction
+
+    file_contents: str
+    if file_extension == "mif":
+        file_contents = mif_format(instruction_dict, label_dict, comment_dict, memory)
+    else:
+        file_contents = mem_format(instruction_dict, label_dict, comment_dict, memory)
+    return encoded_instructions,file_contents
 
 def mem_format(instruction_dict: dict[int, str], label_dict: dict[int, list[str]], comment_dict: dict[int, list[str]], memory: dict[int, int]) -> str:
     output: str
@@ -501,6 +452,57 @@ CONTENT BEGIN
     output += "-- Created with SRC-ASM (https://github.com/davlaf/elec374-assembler)\n"
     return output
 
+def main():
+    parser = argparse.ArgumentParser(
+                    prog='ELEC374 MiniSRC Assembler',
+                    usage='python SRC-ASM.py <input path> -o <output path> -t [mem|mif]',
+                    description='Takes an assembly file and produces a hex dump of the encoded instructions, with syntax supported by modelsim to allow it to be added into the memory with the $readmemh',
+                    epilog='Contact asmhelp@davlaf.com if you have questions or to report bugs, or raise a github Issue')
+
+    parser.add_argument('filename') # input filename
+    parser.add_argument('-o', '--output')      # output filename
+    parser.add_argument('-v', '--verbose',
+                    action='store_true')  # on/off flag
+    parser.add_argument('-t', '--type', default="mem", choices=["mem", "mif"])
+    args = parser.parse_args()
+    input_filename: str = args.filename
+    file_extension: str = args.type
+    is_verbose: bool = args.verbose
+    
+    try:
+        if args.output is None:
+            if match := re.match(r"^(.*)\..*?$", input_filename):
+                output_filename = f"{match.groups()[0]}.{file_extension}"
+            else:
+                output_filename = f"{input_filename}.{file_extension}"  
+        else:
+            output_filename: str = args.output
+            # check if the file extension is different from the type argument
+            if match := re.match(r"^.*\.(.*?)$", args.output):
+                output_filename_file_extension = match.groups()[0]
+                if output_filename_file_extension != file_extension:
+                    print("Warning: Output filename and specified file type don't match")
+
+        file_string: str
+        with open(input_filename, "r", encoding="utf8") as f:
+            file_string = f.read()
+        
+        encoded_instructions, file_contents = assembly_to_file(file_extension, file_string)
+
+        if is_verbose:
+            for instruction_number, instruction in encoded_instructions:
+                print(f"{instruction_number:02X} {instruction:08X}")
+
+        with open(output_filename, "w") as f:
+            f.write(file_contents.encode("ascii", errors="ignore").decode())
+            
+        # not necessarily instructions if the word directive is used
+        print(f"Successfully wrote {len(encoded_instructions)} data words to {output_filename}")
+    except Exception as e:
+        if is_verbose:
+            print(traceback.format_exc())
+        else:
+            print(f"Error when assembling: {e}")
+
 if __name__ == "__main__":
     main()
-        

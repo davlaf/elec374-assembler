@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assembly Assembler</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding-top: 10px;
+        }
+
+        .container {
+            margin: auto;
+            display: flex;
+            width: 95%;
+            height: 80vh;
+            gap: 10px;
+            margin-top: 40px;
+        }
+
+        .column {
+            flex-grow: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        textarea {
+            max-width: 100%;
+            height: 100%;
+            font-family: monospace;
+            padding: 10px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .error {
+            color: red;
+            position: absolute;
+            top: 36px;
+            left: 10px;
+        }
+
+        .download-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        .upload-button {
+            position: absolute;
+            width: 200px;
+            top: 10px;
+            left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="error" id="error"></div>
+    <button class="download-button" id="download" disabled>Download</button>
+    <input type="file" class="upload-button" id="upload" />
+    <div class="container">
+        <div class="column">
+            <textarea id="assemblyCode" placeholder="Enter assembly source code here..."></textarea>
+            <div style="display: flex">
+                <button style="flex-grow: 1"
+                    onclick="document.getElementById('assemblyCode').value = '        ORG 0\n        ldi   R3, 0x65        ; R3 = 0x65\n        ldi   R3, 3(R3)       ; R3 = 0x68\n        ld    R2, 0x54        ; R2 = (0x54) = 0x97\n        ldi   R2, 1(R2)       ; R2 = 0x98\n        ld    R0, -6(R2)      ; R0 = (0x92) = 0x46\n        ldi   R1, 3           ; R1 = 3\n        ldi   R3, 0x57        ; R3 = 0x57\n        brmi  R3, 3           ; continue with the next instruction (will not branch)\n        ldi   R3, 3(R3)       ; R3 = 0x5A\n        ld    R4, -6(R3)      ; R4 = (0x5A - 6) = 0x97\n        nop\n        brpl  R4, 2           ; continue with the instruction at “target” (will branch)\n        ldi   R6, 7(R3)       ; this instruction will not execute\n        ldi   R5, -4(R6)      ; this instruction will not execute\n\ntarget: add   R3, R3, R1      ; R3 = 0x5D\n        addi  R4, R4, 2       ; R4 = 0x99\n        neg   R4, R4          ; R4 = 0xFFFFFF67\n        not   R4, R4          ; R4 = 0x98\n        andi  R4, R4, 0xF     ; R4 = 8\n        ror   R2, R0, R1      ; R2 = 0xC0000008\n        ori   R4, R2, 7       ; R4 = 0xC000000F\n        shra  R2, R4, R1      ; R2 = 0xF8000001\n        shr   R3, R3, R1      ; R3 = 0xB\n        st    0x92, R3        ; (0x92) = 0xB new value in memory with address 0x92\n        rol   R3, R0, R1      ; R3 = 0x230\n        or    R5, R1, R0      ; R5 = 0x47\n        and   R2, R3, R0      ; R2 = 0\n        st    0x54(R2), R5    ; (0x54) = 0x47 new value in memory with address 0x54\n        sub   R0, R3, R5      ; R0 = 0x1E9\n        shl   R2, R3, R1      ; R2 = 0x1180\n        ldi   R5, 8           ; R5 = 8\n        ldi   R6, 0x17        ; R6 = 0x17\n        mul   R6, R5          ; HI = 0; LO = 0xB8\n        mfhi  R4              ; R4 = 0\n        mflo  R7              ; R7 = 0xB8\n        div   R6, R5          ; HI = 7, LO = 2\n        ldi   R10, 1(R5)      ; R10 = 9 setting up argument registers\n        ldi   R11, -3(R6)     ; R11 = 0x14 R10, R11, R12, and R13\n        ldi   R12, 1(R7)      ; R12 = 0xB9\n        ldi   R13, 4(R4)      ; R13 = 4\n        jal   R12             ; address of subroutine subA in R12 - return address in R8\n        halt                  ; upon return, the program halts\n \nsubA:   ORG   0xB9            ; procedure subA\n        add   R15, R10, R12   ; R14 and R15 are return value registers\n        sub   R14, R11, R13   ; R15 = 0xC2, R14 = 0x10\n        sub   R15, R15, R14   ; R15 = 0xB2\n        jr    R8              ; return from procedure\n               \n        ORG   0x54 ; initialize memory as asked\n        WORD  0x97\n        ORG   0x92\n        WORD  0x46';">
+                    Load Phase 3 Program
+                </button>
+                <button style="flex-grow: 1"
+                    onclick="document.getElementById('assemblyCode').value = '    ORG 0\n; Initialize Registers\n    ldi R3, 0x65       ; R3 = 0x65 \n    ldi R3, 3(R3)      ; R3 = 0x68\n    ld R2, 0x54        ; R2 = (0x54) = 0x97\n    ldi R2, 1(R2)      ; R2 = 0x98\n    ld R0, -6(R2)      ; R0 = (0x92) = 0x46\n    ldi R1, 3          ; R1 = 3\n    ldi R3, 0x57       ; R3 = 0x57\n    brmi R3, 3         ; Continue with next instruction (no branch)\n    ldi R3, 3(R3)      ; R3 = 0x5A\n    ld R4, -6(R3)      ; R4 = (0x5A - 6) = 0x97\n    nop\n    brpl R4, 2         ; Branch to target (will branch)\n    ldi R6, 7(R3)      ; This instruction will not execute\n    ldi R5, -4(R6)     ; This instruction will not execute\n\n; Target Label\ntarget:\n    add R3, R3, R1     ; R3 = 0x5D\n    addi R4, R4, 2     ; R4 = 0x99\n    neg R4, R4         ; R4 = 0xFFFFFF67\n    not R4, R4         ; R4 = 0x98\n    andi R4, R4, 0xF   ; R4 = 8\n    ror R2, R0, R1     ; R2 = 0xC0000008\n    ori R4, R2, 7      ; R4 = 0xC000000F\n    shra R2, R4, R1    ; R2 = 0xF8000001\n    shr R3, R3, R1     ; R3 = 0xB\n    st 0x92, R3        ; (0x92) = 0xB (new memory value at 0x92)\n    rol R3, R0, R1     ; R3 = 0x230\n    or R5, R1, R0      ; R5 = 0x47  \n    and R2, R3, R0     ; R2 = 0\n    st 0x54(R2), R5    ; (0x54) = 0x47 (new memory value at 0x54)\n    sub R0, R3, R5     ; R0 = 0x1E9\n    shl R2, R3, R1     ; R2 = 0x1180\n\n    ; Multiplication and Division Operations\n    ldi R5, 8          ; R5 = 8\n    ldi R6, 0x17       ; R6 = 0x17\n    mul R6, R5         ; HI = 0; LO = 0xB8\n    mfhi R4            ; R4 = 0\n    mflo R7            ; R7 = 0xB8\n    div R6, R5         ; HI = 7 , LO = 2\n\n    ; Setting Up Argument Registers\n    ldi R10, 1(R5)     ; R10 = 9\n    ldi R11, -3(R6)    ; R11 = 0x14\n    ldi R12, 1(R7)     ; R12 = 0xB9\n    ldi R13, 4(R4)     ; R13 = 4\n    jal R12            ; Jump to subA (R12), store return address in R8\n\n    ; Loop and Display Logic\n    in R4               ; Read switch input (SW[0] to SW[7] = 0xC0) into R4\n    st 0x55, R4         ; Store for next iteration\n    ldi R1, 0x2E        ; Address of loop\n    ldi R7, 1           ; R7 = 1\n    ldi R5, 40          ; Loop counter (40 iterations)\n\nloop:\n    out R4              ; Display R4 on 7-segment display\n    ldi R5, -1(R5)      ; Decrement loop counter\n    brzr R5, 8          ; If zero, branch to done\n    ld R6, 0xF0         ; Load delay counter\n\nloop2:\n    ldi R6, -1(R6)      ; Decrement delay counter\n    nop\n    brnz R6, -3         ; Repeat delay if R6 ≠ 0\n    \n    shr R4, R4, R7      ; Shift R4 right\n    brnz R4, -9         ; Repeat loop if R4 ≠ 0\n    ld R4, 0x55         ; Reload initial value from address 0x55\n    jr R1               ; Jump to loop\n\ndone:\n    ldi R4, 0xAA        ; Final display value\n    out R4              ; Display 0xAA\n    halt                ; Halt execution\n\n\nsubA: ORG 0xB9          ; Subroutine: subA\n    add R15, R10, R12   ; R15 = 0xC2\n    sub R14, R11, R13   ; R14 = 0x10\n    sub R15, R15, R14   ; R15 = 0xB2\n    jr R8               ; Return from subroutine\n\nORG 0x54\nWORD 0x97\nORG 0x92\nWORD 0x46\nORG 0xF0\nWORD 0xFFFF'">
+                    Load Phase 4 Program
+                </button>
+            </div>
+        </div>
+        <div class="controls">
+            <button onclick="assemble('mem')">Assemble to .mem →</button>
+            <button onclick="assemble('mif')">Assemble to .mif →</button>
+        </div>
+        <div class="column">
+            <textarea id="output" readonly placeholder="Assembled output will appear here..."></textarea>
+        </div>
+    </div>
+    <script>
+        file_extension = ""
+
+        function assemble(format) {
+            const code = document.getElementById('assemblyCode').value;
+            fetch('/assemble', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ code: code, format: format })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('error').textContent = data.error;
+                    } else {
+                        file_extension = format
+                        document.getElementById('error').textContent = "";
+                        document.getElementById('output').value = data.output;
+                        document.getElementById('download').disabled = false;
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('error').textContent = `Error getting assembly: ${error}`;
+                });
+        }
+
+        document.getElementById('download').addEventListener('click', function () {
+            const outputContent = document.getElementById('output').value;
+            if (!outputContent) return;
+
+            const filename = prompt("Enter filename", `output.${file_extension}`);
+            if (!filename) return;
+
+            const a = document.createElement('a');
+            a.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(outputContent));
+            a.setAttribute('download', filename);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+
+            // fetch('/download', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            //     body: new URLSearchParams({ output: outputContent, filename: filename })
+            // })
+            //     .then(response => response.blob())
+            //     .then(blob => {
+            //         const url = window.URL.createObjectURL(blob);
+            //         const a = document.createElement('a');
+            //         a.href = url;
+            //         a.download = filename;
+            //         document.body.appendChild(a);
+            //         a.click();
+            //         document.body.removeChild(a);
+            //     });
+        });
+
+        document.getElementById('upload').addEventListener('change', function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('assemblyCode').value = e.target.result;
+            };
+            reader.readAsText(file);
+        });
+    </script>
+</body>
+
+</html>

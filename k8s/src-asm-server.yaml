@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: src-asm-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: src-asm-server
+  template:
+    metadata:
+      labels:
+        app: src-asm-server
+    spec:
+      containers:
+        - name: src-asm-server
+          image: <> # YOUR docker image (ex: davlaf/srcasm:latest)
+          ports:
+            - containerPort: 5000
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+      imagePullSecrets:
+        - name: docker-hub-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: src-asm-server
+spec:
+  selector:
+    app: src-asm-server
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 5000
+      name: http
+  type: LoadBalancer
