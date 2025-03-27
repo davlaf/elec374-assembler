@@ -89,11 +89,10 @@ Press CTRL+C to quit
 ```
 Click on the link in the `Running on http://127.0.0.1:5000` line and the server should run. This setup is best for development.
 
-## Deploying website locally
-You can deploy with docker by building and running the container:
+## Running website locally with docker-compose
+You can deploy with docker compose by simply running this command:
 ```bash
-docker build -t src-asm . 
-docker run --rm -p 8080:5000 src-asm
+docker compose up
 ```
 You can then go to [http://localhost:8080](localhost:8080) and access the website.
 
@@ -134,6 +133,20 @@ The deployment yaml files used are in the k8s folder of the repo. The steps belo
 6. Now the cloudflare tunnel dashboard should say the tunnel is healthy. To enable access to the service, add a public hostname, set the subdomain name, set the service type to http and set the url to `src-asm-server:8080`.
 
 Now you can access the service at the public hostname created with TLS enabled.
-## Contact
+
+## Deploying website with docker-compose 
+If you want to also deploy it with cloudflare tunnels, you can create a `cloudflare-tunnel-secret.yaml` file and add this to the file, replacing \<token\> with your cloudflare tunnel token
+```
+TUNNEL_TOKEN=<token>
+```
+In your tunnel, set the service type to `http` and set the url to `src-asm:5000`.
+Then run the command below:
+```bash
+docker compose --profile staging up
+```
+Instructions for how to get the cloudflare token are in the Kubernetes section. 
+
+
+# Contact
 For questions, bug reports, or feature requests, please contact:
 asmhelp@davlaf.com

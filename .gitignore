@@ -6,6 +6,7 @@
 !phase3_program.s
 !phase4_program.s
 !requirements.txt
+cloudflare-tunnel-secret.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
