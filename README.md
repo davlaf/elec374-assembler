@@ -2,7 +2,7 @@
 
 ## Try it out!
 
-A web version is hosted on the Sci '65 server and is available at [src-asm.howdoesthieven.work](src-asm.howdoesthieven.work).
+A web version is hosted on the Sci '65 server and is available at [src-asm.howdoesthieven.work](https://src-asm.howdoesthiseven.work).
 
 ## Overview
 The ELEC374 MiniSRC Assembler is a Python tool designed to translate assembly code written for the Mini SRC (a simple 32-bit RISC computer) into a hexadecimal dump of encoded instructions. The output is formatted for use with ModelSim’s $readmemh directive to load instructions into memory.
