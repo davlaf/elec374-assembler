@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1.4
-FROM --platform=$BUILDPLATFORM python:3.12-slim AS builder
+FROM --platform=$BUILDPLATFORM python:3.13-alpine AS builder
+FROM python:3.13-alpine
 
 WORKDIR /app
 
-COPY requirements.txt /app
+COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install -r requirements.txt gunicorn
+    pip3 install -r requirements.txt
 
-COPY . /app
+COPY . .
 
-# Expose port 5000 inside the container
 EXPOSE 5000
 
 # Run the Flask app with Gunicorn in production mode
